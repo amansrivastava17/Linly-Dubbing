@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  web:
+    image: linly-dubbing
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_ENDPOINT=https://hf-mirror.com
+      - HF_HOME=/data/huggingface_cache
+      - TRANSFORMERS_OFFLINE=1
+      - HF_DATASETS_OFFLINE=1
+      - LIBROSA_CACHE_DIR=/data/librosa_cache
+      - NUMBA_CACHE_DIR=/data/numba_cache
+      - NUMBA_DISABLE_JIT=1
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
+      - ./models:/app/models
+      - huggingface_cache:/data/huggingface_cache
+      - pytorch_cache:/root/.cache/torch
+      - librosa_cache:/data/librosa_cache
+      - numba_cache:/data/numba_cache
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker:
+    image: linly-dubbing
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A main.celery worker --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_ENDPOINT=https://hf-mirror.com
+      - HF_HOME=/data/huggingface_cache
+      - TRANSFORMERS_OFFLINE=1
+      - HF_DATASETS_OFFLINE=1
+      - LIBROSA_CACHE_DIR=/data/librosa_cache
+      - NUMBA_CACHE_DIR=/data/numba_cache
+      - NUMBA_DISABLE_JIT=1
+    volumes:
+      - .:/app
+      - ./models:/app/models
+      - huggingface_cache:/data/huggingface_cache
+      - pytorch_cache:/root/.cache/torch
+      - librosa_cache:/data/librosa_cache
+      - numba_cache:/data/numba_cache
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  frontend:
+    image: linly-dubbing
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: streamlit run frontend.py
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://web:8000
+    volumes:
+      - .:/app
+    depends_on:
+      - web
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+  huggingface_cache:
+  pytorch_cache:
+  librosa_cache:
+  numba_cache:

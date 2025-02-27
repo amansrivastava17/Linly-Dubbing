@@ -145,12 +145,3 @@ def do_everything(root_folder, url, num_videos=5, resolution='1080p',
                 fail_list.append(info)
 
     return f'Success: {len(success_list)}\nFail: {len(fail_list)}', out_video
-
-
-if __name__ == '__main__':
-    do_everything(
-        root_folder = 'videos', 
-        url = 'videos/14.mp4',
-        translation_method = 'OpenAI', 
-        # translation_method = 'Google Translate', translation_target_language = '简体中文',
-        )
